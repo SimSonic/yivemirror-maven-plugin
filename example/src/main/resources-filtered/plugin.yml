@@ -1,0 +1,11 @@
+name:    ${project.artifactId}
+main:    ru.simsonic.minecraft.yivemirror.example.Main
+version: ${project.version}
+website: ${project.url}
+author:  SimSonic
+load:    POSTWORLD
+
+softdepend: []
+
+commands:
+permissions:

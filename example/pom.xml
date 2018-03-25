@@ -47,6 +47,8 @@
                 <configuration>
                     <serverType>spigot</serverType>
                     <serverVersion>${spigot-build}</serverVersion>
+                    <directory>server</directory>
+                    <resources>server-resources</resources>
                 </configuration>
             </plugin>
         </plugins>

@@ -13,11 +13,17 @@ import org.apache.maven.plugins.annotations.Parameter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import java.util.stream.Stream;
 
 @Mojo(name = "run")
@@ -133,8 +139,29 @@ public class RunMojo extends AbstractMojo {
         }
     }
 
-    private void run(File serverJar, File serverDir) {
-        getLog().info("Running ...");
+    private void run(File serverJar, File serverDir) throws IOException {
+        info("Running ...");
+        System.setProperty("user.dir", serverDir.getAbsolutePath());
+        String mainClassName = getJarMainClass(serverJar);
+        try {
+            URL[] urls = {serverJar.toURI().toURL()};
+            ClassLoader classLoader = new URLClassLoader(urls);
+            Class<?> mainClass = classLoader.loadClass(mainClassName);
+            Method method = mainClass.getMethod("main", String[].class);
+            Thread.currentThread().setContextClassLoader(classLoader);
+            String[] args = { "nojline" };
+            method.invoke(null, new Object[]{args});
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static String getJarMainClass(File serverJar) throws IOException {
+        try (JarFile jarFile = new JarFile(serverJar)) {
+            return Optional.ofNullable(jarFile.getManifest())
+                    .map(Manifest::getMainAttributes)
+                    .map(m -> m.getValue("Main-Class"))
+                    .orElseThrow(() -> new IOException("Server core has no set up main class."));
+        }
     }
 
     private void debug(String format, Object... args) {

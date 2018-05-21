@@ -22,6 +22,13 @@
         <spigot-build>1.12.2-R0.1-SNAPSHOT-b1637</spigot-build>
     </properties>
 
+    <pluginRepositories>
+        <pluginRepository>
+            <id>yivemirror-maven-plugin-repo</id>
+            <url>https://simsonic.github.io/yivemirror-maven-plugin/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <repositories>
         <repository>
             <id>spigot-repo</id>

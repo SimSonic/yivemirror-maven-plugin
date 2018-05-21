@@ -13,18 +13,11 @@ import org.apache.maven.plugins.annotations.Parameter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
 import java.util.stream.Stream;
 
 @SuppressWarnings("AccessOfSystemProperties")
@@ -32,18 +25,12 @@ import java.util.stream.Stream;
 public class RunMojo extends AbstractMojo {
 
     public static final String DEFAULT_SERVER_TYPE = "spigot";
+
     public static final String DEFAULT_SERVER_VERSION = "latest";
+
     public static final String DEFAULT_SUBDIRECTORY = "server";
+
     public static final String DEFAULT_RESOURCES = "server-resources";
-
-    @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
-    public File projectDirectory;
-
-    @Parameter(defaultValue = "${project.build.directory}", readonly = true, required = true)
-    public File buildDirectory;
-
-    @Parameter(defaultValue = "${project.build.finalName}", readonly = true, required = true)
-    public String finalName;
 
     /**
      * Spigot, PaperSpigot, Thermos, etc.
@@ -63,40 +50,56 @@ public class RunMojo extends AbstractMojo {
     @Parameter(property = "resources", defaultValue = DEFAULT_RESOURCES)
     public String resources;
 
+    @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
+    public File projectDirectory;
+
+    @Parameter(defaultValue = "${project.build.directory}", readonly = true, required = true)
+    public File buildDirectory;
+
+    @Parameter(defaultValue = "${project.build.finalName}", readonly = true, required = true)
+    public String finalName;
+
+    private final LogWrapper logger = new LogWrapper(getLog());
+
+    private final LocalCache localCache = new LocalCache();
+
+    private final ServerStarter serverStarter = new ServerStarter(logger);
+
+    private final YivesMirrorUrlSource urlSource = new YivesMirrorUrlSource();
+
     @Override
     public void execute() throws MojoExecutionException {
         try {
-            String filename = String.format("%s-%s.jar", serverType, serverVersion);
-            File cached = searchInCache(filename);
-            if (!cached.isFile()) {
-                download(filename, cached);
+            ServerDescription serverDescription = getServerVersion();
+            String filename = urlSource.getFilenameForServer(serverDescription);
+            File locationInCache = localCache.getServerFile(filename);
+            if (locationInCache.isFile()) {
+                logger.debug("Location of cached version: %s", locationInCache);
+            } else {
+                String url = urlSource.getUrlForServer(serverDescription);
+                logger.info("Downloading from %s into %s", url, locationInCache);
+                downloadFile(url, locationInCache);
             }
 
-            File serverDir = new File(buildDirectory, directory);
-            install(cached, serverDir);
+            logger.info("Preparing directory for running server ...");
+            File serverDirectory = new File(buildDirectory, directory);
+            ServerEnvironment environment = new ServerEnvironment(serverDirectory, locationInCache);
+            install(environment);
 
-            run(cached, serverDir);
+            logger.info("Starting minecraft server ...");
+            serverStarter.run(environment);
         } catch (Exception ex) {
             throw new MojoExecutionException("Internal plugin error.", ex);
         }
     }
 
-    private File searchInCache(String filename) {
-        String mavenPluginFile = RunMojo.class.getProtectionDomain().getCodeSource().getLocation().getFile();
-        File cacheDirectory = new File(new File(mavenPluginFile).getParentFile(), "cache");
-        cacheDirectory.mkdirs();
-        File result = new File(cacheDirectory, filename);
-        debug("Location of cached version: %s", result);
-        return result;
+    private ServerDescription getServerVersion() {
+        return new ServerDescription(
+                ServerType.valueOf(serverType.toUpperCase()),
+                serverVersion);
     }
 
-    private void download(String filename, File target) throws IOException {
-        String url = String.format("https://yivesmirror.com/files/%s/%s", serverType, filename);
-        info("Downloading from %s into %s", url, target);
-        target.getParentFile().mkdirs();
-        downloadFile(url, target);
-    }
-
+    @SuppressWarnings({"resource", "IOResourceOpenedButNotSafelyClosed"})
     private static void downloadFile(String sourceUrl, File target) throws IOException {
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpUriRequest request = new HttpGet(sourceUrl);
@@ -107,117 +110,52 @@ public class RunMojo extends AbstractMojo {
         }
     }
 
-    private void install(File serverJar, File serverDir) throws IOException, MojoExecutionException {
-        getLog().info("Installing ...");
-
-        serverDir.mkdirs();
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private void install(ServerEnvironment environment) throws IOException, MojoExecutionException {
+        File serverDirectory = environment.getServerDirectory();
+        serverDirectory.mkdirs();
 
         File resourcesDir = new File(projectDirectory, resources);
         if (resourcesDir.isDirectory()) {
-            copyFolder(resourcesDir, serverDir);
+            copyResources(resourcesDir, serverDirectory);
         }
 
-        File compiledPlugin = new File(buildDirectory, finalName + ".jar");
-        if (!compiledPlugin.isFile()) {
-            throw new MojoExecutionException("Compiled plugin .jar is absent.");
-        }
-        File pluginsDir = new File(serverDir, "plugins");
-        pluginsDir.mkdirs();
-        File installedPlugin = new File(pluginsDir, finalName + ".jar");
+        File pluginsDirectory = environment.getPluginsDirectory();
+        pluginsDirectory.mkdirs();
+
+        String filename = finalName + ".jar";
+        File compiledPlugin = getCompiledPluginJar(filename);
+        File installedPlugin = new File(pluginsDirectory, filename);
         Files.copy(compiledPlugin.toPath(), installedPlugin.toPath());
     }
 
-    private void copyFolder(File sourceDir, File targetDir) throws IOException {
-        try (Stream<Path> stream = Files.walk(sourceDir.toPath())) {
-            stream.filter(f -> f.toFile().isFile())
-                    .forEach(sourcePath -> copyFile(sourcePath, targetDir.toPath()));
+    private File getCompiledPluginJar(String filename) throws MojoExecutionException {
+        File compiledPlugin = new File(buildDirectory, filename);
+        if (compiledPlugin.isFile()) {
+            return compiledPlugin;
+        }
+        throw new MojoExecutionException("Compiled plugin .jar is absent.");
+    }
+
+    private void copyResources(File resourcesDir, File serverDirectory) throws IOException {
+        Path resourcesPath = resourcesDir.toPath();
+        Path destinationPath = serverDirectory.toPath();
+        try (Stream<Path> stream = Files.walk(resourcesPath)) {
+            stream.filter(path -> path.toFile().isFile())
+                    .forEach(path -> copyResource(resourcesPath, path, destinationPath));
         }
     }
 
-    private void copyFile(Path sourcePath, Path destPath) {
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private void copyResource(Path resourcesPath, Path sourcePath, Path destPath) {
         try {
-            info("Copy file: " + destPath);
-            Path relative = sourcePath.relativize(destPath);
+            logger.debug("Copy file: " + destPath);
+            Path relative = resourcesPath.relativize(sourcePath);
             Path resolved = destPath.resolve(relative);
             resolved.toFile().getParentFile().mkdirs();
             Files.copy(sourcePath, resolved);
         } catch (Exception ex) {
-            error(ex.getMessage());
+            logger.error(ex.getMessage());
         }
-    }
-
-    private void run(File serverJar, File serverDir) throws IOException {
-        info("Running ...");
-
-        File pluginsDir = new File(serverDir, "plugins");
-
-        System.setProperty("com.mojang.eula.agree", "true");
-        System.setProperty("log4j.skipJansi", "true");
-        System.setProperty("IReallyKnowWhatIAmDoingISwear", "true");
-
-        Object[] arguments = {new String[]{
-                "--config", new File(serverDir, "server.properties").getAbsolutePath(),
-                "--bukkit-settings", new File(serverDir, "bukkit.yml").getAbsolutePath(),
-                "--spigot-settings", new File(serverDir, "spigot.yml").getAbsolutePath(),
-                "--commands-settings", new File(serverDir, "commands.yml").getAbsolutePath(),
-                "--plugins", pluginsDir.getAbsolutePath(),
-                "--world-dir", serverDir.getAbsolutePath(),
-                "--nojline",
-        }};
-
-        URL[] urls = Collections.singletonList(serverJar.toURI().toURL()).toArray(new URL[0]);
-        try (URLClassLoader childClassLoader = new URLClassLoader(urls)) {
-
-            String mainClassName = getJarMainClass(serverJar);
-            Class<?> mainClass = childClassLoader.loadClass(mainClassName);
-            Method method = mainClass.getMethod("main", String[].class);
-
-            method.invoke(null, arguments);
-
-            Thread.currentThread().join();
-        } catch (Exception ex) {
-            error(ex.toString());
-        }
-    }
-
-    private static String getJarMainClass(File serverJar) throws IOException {
-        try (JarFile jarFile = new JarFile(serverJar)) {
-            return Optional.ofNullable(jarFile.getManifest())
-                    .map(Manifest::getMainAttributes)
-                    .map(m -> m.getValue("Main-Class"))
-                    .orElseThrow(() -> new IOException("Server core has no set up main class."));
-        }
-    }
-
-    private void debug(String message) {
-        getLog().debug(String.format("%s", message));
-    }
-
-    private void info(String message) {
-        getLog().info(String.format("%s", message));
-    }
-
-    private void warn(String message) {
-        getLog().warn(String.format("%s", message));
-    }
-
-    private void error(String message) {
-        getLog().error(String.format("%s", message));
-    }
-
-    private void debug(String format, Object... args) {
-        getLog().debug(String.format(format, args));
-    }
-
-    private void info(String format, Object... args) {
-        getLog().info(String.format(format, args));
-    }
-
-    private void warn(String format, Object... args) {
-        getLog().warn(String.format(format, args));
-    }
-
-    private void error(String format, Object... args) {
-        getLog().error(String.format(format, args));
     }
 }

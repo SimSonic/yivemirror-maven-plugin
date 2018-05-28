@@ -12,13 +12,13 @@
 
 config-version: 11
 settings:
-  debug: false
+  debug: true
   save-user-cache-on-stop-only: false
   moved-too-quickly-multiplier: 10.0
   moved-wrongly-threshold: 0.0625
   filter-creative-items: true
-  timeout-time: 60
-  restart-on-crash: true
+  timeout-time: 2147483647
+  restart-on-crash: false
   restart-script: ./start.sh
   attribute:
     maxHealth:
@@ -62,7 +62,7 @@ commands:
   tab-complete: 0
 world-settings:
   default:
-    verbose: true
+    verbose: false
     view-distance: 10
     zombie-aggressive-towards-villager: true
     wither-spawn-sound-radius: 0

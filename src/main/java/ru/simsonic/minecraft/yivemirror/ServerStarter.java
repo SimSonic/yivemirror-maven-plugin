@@ -20,7 +20,8 @@ public class ServerStarter {
 
     public void run(ServerEnvironment environment) throws IOException {
         System.setProperty("com.mojang.eula.agree", "true");
-        System.setProperty("log4j.skipJansi", "true");
+        //System.setProperty("log4j.skipJansi", "true");
+        //System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
         System.setProperty("IReallyKnowWhatIAmDoingISwear", "true");
 
         File serverDirectory = environment.getServerDirectory();

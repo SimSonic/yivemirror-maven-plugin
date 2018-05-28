@@ -82,7 +82,7 @@ public class RunMojo extends AbstractMojo {
             }
 
             logger.info("Preparing directory for running server ...");
-            File serverDirectory = new File(project.getBuild().getOutputDirectory(), directory);
+            File serverDirectory = new File(project.getBuild().getDirectory(), directory);
             ServerEnvironment environment = new ServerEnvironment(serverDirectory, locationInCache);
             install(environment);
 
@@ -111,7 +111,7 @@ public class RunMojo extends AbstractMojo {
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void install(ServerEnvironment environment) throws IOException, MojoExecutionException {
+    private void install(ServerEnvironment environment) throws IOException {
         File serverDirectory = environment.getServerDirectory();
         serverDirectory.mkdirs();
 

@@ -147,9 +147,9 @@ public class RunMojo extends AbstractMojo {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private void copyResource(Path resourcesPath, Path sourcePath, Path destPath) {
         try {
-            logger.debug("Copy file: " + destPath);
             Path relative = resourcesPath.relativize(sourcePath);
             Path resolved = destPath.resolve(relative);
+            logger.debug("Copy file: " + resolved);
             resolved.toFile().getParentFile().mkdirs();
             Files.copy(sourcePath, resolved);
         } catch (Exception ex) {

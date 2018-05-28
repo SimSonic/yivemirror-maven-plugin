@@ -20,8 +20,8 @@ public class ServerStarter {
 
     public void run(ServerEnvironment environment) throws IOException {
         System.setProperty("com.mojang.eula.agree", "true");
-        //System.setProperty("log4j.skipJansi", "true");
-        //System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
+        System.setProperty("log4j.skipJansi", "true");
+        System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
         System.setProperty("IReallyKnowWhatIAmDoingISwear", "true");
 
         File serverDirectory = environment.getServerDirectory();
@@ -32,6 +32,7 @@ public class ServerStarter {
                 "--config", new File(serverDirectory, "server.properties").getAbsolutePath(),
                 "--bukkit-settings", new File(serverDirectory, "bukkit.yml").getAbsolutePath(),
                 "--spigot-settings", new File(serverDirectory, "spigot.yml").getAbsolutePath(),
+                "--paper-settings", new File(serverDirectory, "paper.yml").getAbsolutePath(),
                 "--commands-settings", new File(serverDirectory, "commands.yml").getAbsolutePath(),
                 "--plugins", pluginsDirectory.getAbsolutePath(),
                 "--world-dir", serverDirectory.getAbsolutePath(),

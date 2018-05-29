@@ -14,6 +14,7 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.artifact.ProjectArtifactMetadata;
+import ru.simsonic.minecraft.yivemirror.api.RemoteDescription;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -23,6 +24,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 @SuppressWarnings("AccessOfSystemProperties")
@@ -70,14 +72,20 @@ public class RunMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException {
         try {
-            ServerDescription serverDescription = getServerVersion();
+            ServerDescription serverDescription = ServerDescription.from(serverType, serverVersion);
+            RemoteDescription remoteDescription = urlSource.fetchInfoAboutServer(serverDescription);
+
             String filename = urlSource.getFilenameForServer(serverDescription);
-            File locationInCache = localCache.getServerFile(filename);
-            if (locationInCache.isFile()) {
-                logger.debug("Location of cached version: %s", locationInCache);
+            File locationInCache = localCache.getServerFile(serverDescription, filename);
+            if (locationInCache.isFile() && Objects.equals(locationInCache.length(), remoteDescription.getSizeInBytes())) {
+                logger.debug("Server file already exist: %s", locationInCache);
             } else {
-                String url = urlSource.getUrlForServer(serverDescription);
-                logger.info("Downloading from %s into %s", url, locationInCache);
+                //noinspection ResultOfMethodCallIgnored
+                locationInCache.delete();
+
+                String url = urlSource.getDownloadUrlForServer(serverDescription);
+                logger.info("Downloading server from %s", url);
+                logger.info("Downloading server into %s", locationInCache);
                 downloadFile(url, locationInCache);
             }
 
@@ -93,14 +101,11 @@ public class RunMojo extends AbstractMojo {
         }
     }
 
-    private ServerDescription getServerVersion() {
-        return new ServerDescription(
-                ServerType.valueOf(serverType.toUpperCase()),
-                serverVersion);
-    }
-
     @SuppressWarnings({"resource", "IOResourceOpenedButNotSafelyClosed"})
     private static void downloadFile(String sourceUrl, File target) throws IOException {
+        //noinspection ResultOfMethodCallIgnored
+        target.getParentFile().mkdirs();
+
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpUriRequest request = new HttpGet(sourceUrl);
             CloseableHttpResponse response = httpClient.execute(request);
@@ -149,7 +154,7 @@ public class RunMojo extends AbstractMojo {
         try {
             Path relative = resourcesPath.relativize(sourcePath);
             Path resolved = destPath.resolve(relative);
-            logger.debug("Copy file: " + resolved);
+            logger.debug("Coping resource file: " + resolved);
             resolved.toFile().getParentFile().mkdirs();
             Files.copy(sourcePath, resolved);
         } catch (Exception ex) {

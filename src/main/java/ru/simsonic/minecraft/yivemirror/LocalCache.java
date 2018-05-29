@@ -15,7 +15,8 @@ public class LocalCache {
         CACHE_HOME.mkdirs();
     }
 
-    public File getServerFile(String filename) {
-        return new File(CACHE_HOME, filename);
+    public File getServerFile(ServerDescription serverDescription, String filename) {
+        File catalogForServerType = new File(CACHE_HOME, serverDescription.getType().getCatalog());
+        return new File(catalogForServerType, filename);
     }
 }

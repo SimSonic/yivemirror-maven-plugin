@@ -51,6 +51,12 @@ public class RunMojo extends AbstractMojo {
     @Parameter(property = "serverVersion", defaultValue = DEFAULT_SERVER_VERSION)
     public String serverVersion;
 
+    /**
+     * Custom server.jar name (should be in server-resources dir)
+     */
+    @Parameter(property = "serverJar", defaultValue = "")
+    public String serverJar;
+
     @Parameter(property = "directory", defaultValue = DEFAULT_SUBDIRECTORY)
     public String directory;
 
@@ -91,7 +97,15 @@ public class RunMojo extends AbstractMojo {
 
             logger.info("Preparing directory for running server ...");
             File serverDirectory = new File(project.getBuild().getDirectory(), directory);
-            ServerEnvironment environment = new ServerEnvironment(serverDirectory, locationInCache);
+            File targetJar = locationInCache;
+            if (serverJar != null && !serverJar.isEmpty()) {
+                File resourcesDir = new File(project.getBasedir(), resources);
+                File customServerJar = new File(resourcesDir, serverJar);
+                if (customServerJar.isFile()) {
+                    targetJar = customServerJar;
+                }
+            }
+            ServerEnvironment environment = new ServerEnvironment(serverDirectory, targetJar);
             install(environment);
 
             logger.info("Starting minecraft server ...");

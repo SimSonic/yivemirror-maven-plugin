@@ -71,7 +71,7 @@ public class ServerStarter {
         commandLineParameters.add(serverDirectory.getAbsolutePath());
         commandLineParameters.add("--nojline");
 
-        commandLineParameters.forEach(p -> logger.debug("Command line param: "));
+        commandLineParameters.forEach(p -> logger.debug("Command line param: " + p));
         logger.debug("Server jar file: " + serverJar.getAbsolutePath());
 
         URL[] urls = Collections.singletonList(serverJar.toURI().toURL()).toArray(new URL[0]);

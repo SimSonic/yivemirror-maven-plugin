@@ -27,7 +27,6 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-@SuppressWarnings("AccessOfSystemProperties")
 @Mojo(name = "run", defaultPhase = LifecyclePhase.PACKAGE)
 public class RunMojo extends AbstractMojo {
 
@@ -54,7 +53,7 @@ public class RunMojo extends AbstractMojo {
     /**
      * Custom server.jar name (should be in server-resources dir)
      */
-    @Parameter(property = "serverJar", defaultValue = "")
+    @Parameter(property = "serverJar")
     public String serverJar;
 
     @Parameter(property = "directory", defaultValue = DEFAULT_SUBDIRECTORY)
@@ -78,40 +77,54 @@ public class RunMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException {
         try {
-            ServerDescription serverDescription = ServerDescription.from(serverType, serverVersion);
-            RemoteDescription remoteDescription = urlSource.fetchInfoAboutServer(serverDescription);
+            boolean isLocallyProvidedJar = serverJar != null && !serverJar.isEmpty();
+            ServerDescription serverDescription = isLocallyProvidedJar
+                    ? ServerDescription.forLocallyProvided(serverJar)
+                    : ServerDescription.forRemote(serverType, serverVersion);
 
             String filename = urlSource.getFilenameForServer(serverDescription);
             File locationInCache = localCache.getServerFile(serverDescription, filename);
-            if (locationInCache.isFile() && Objects.equals(locationInCache.length(), remoteDescription.getSizeInBytes())) {
-                logger.debug("Server file already exist: %s", locationInCache);
+            if (isLocallyProvidedJar) {
+                saveLocallyProvidedJar(serverDescription, locationInCache);
             } else {
-                //noinspection ResultOfMethodCallIgnored
-                locationInCache.delete();
-
-                String url = urlSource.getDownloadUrlForServer(serverDescription);
-                logger.info("Downloading server from %s", url);
-                logger.info("Downloading server into %s", locationInCache);
-                downloadFile(url, locationInCache);
+                saveRemoteJar(serverDescription, locationInCache);
             }
 
             logger.info("Preparing directory for running server ...");
             File serverDirectory = new File(project.getBuild().getDirectory(), directory);
-            File targetJar = locationInCache;
-            if (serverJar != null && !serverJar.isEmpty()) {
-                File resourcesDir = new File(project.getBasedir(), resources);
-                File customServerJar = new File(resourcesDir, serverJar);
-                if (customServerJar.isFile()) {
-                    targetJar = customServerJar;
-                }
-            }
-            ServerEnvironment environment = new ServerEnvironment(serverDirectory, targetJar);
+            ServerEnvironment environment = new ServerEnvironment(serverDirectory, locationInCache);
             install(environment);
 
             logger.info("Starting minecraft server ...");
             serverStarter.run(environment);
         } catch (Exception ex) {
             throw new MojoExecutionException("Internal plugin error.", ex);
+        }
+    }
+
+    private void saveLocallyProvidedJar(ServerDescription serverDescription, File locationInCache) throws IOException {
+        File serverJarFile = new File(serverJar);
+        logger.info("Using locally provided .jar file: " + serverJar);
+        if (!locationInCache.isFile() || locationInCache.length() != serverJarFile.length()) {
+            logger.info("Copy of this .jar will be stored in cache now; version = " + serverDescription.getVersion());
+            //noinspection ResultOfMethodCallIgnored
+            locationInCache.getParentFile().mkdirs();
+            Files.copy(serverJarFile.toPath(), locationInCache.toPath());
+        }
+    }
+
+    private void saveRemoteJar(ServerDescription serverDescription, File locationInCache) throws MojoExecutionException, IOException {
+        RemoteDescription remoteDescription = urlSource.fetchInfoAboutServer(serverDescription);
+        if (locationInCache.isFile() && Objects.equals(locationInCache.length(), remoteDescription.getSizeInBytes())) {
+            logger.debug("Server file already exist: %s", locationInCache);
+        } else {
+            //noinspection ResultOfMethodCallIgnored
+            locationInCache.delete();
+
+            String url = urlSource.getDownloadUrlForServer(serverDescription);
+            logger.info("Downloading server from %s", url);
+            logger.info("Downloading server into %s", locationInCache);
+            downloadFile(url, locationInCache);
         }
     }
 

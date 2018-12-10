@@ -1,7 +1,9 @@
 package ru.simsonic.minecraft.yivemirror;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 @Getter
 public enum ServerType {
 
@@ -9,14 +11,11 @@ public enum ServerType {
 
     PAPER_SPIGOT("paperspigot", "PaperSpigot-%s.jar"),
 
-    THERMOS("thermos", "Thermos-%s.zip");
+    THERMOS("thermos", "Thermos-%s.zip"),
+
+    LOCALLY_PROVIDED("custom", "%s.jar");
 
     private final String catalog;
 
     private final String filenameFormat;
-
-    ServerType(String catalog, String filenameFormat) {
-        this.catalog = catalog;
-        this.filenameFormat = filenameFormat;
-    }
 }

@@ -24,7 +24,7 @@ public class ServerDescription {
         if (serverJarFile.isFile()) {
             try {
                 byte[] hash = hashFile(serverJarFile);
-                String version = binaryToHex(hash);
+                String version = String.format("%s.%s", binaryToHex(hash), FileUtils.getExtension(serverJarFile));
                 return new ServerDescription(ServerType.LOCALLY_PROVIDED, version);
             } catch (IOException | NoSuchAlgorithmException ignored) {
             }

@@ -74,6 +74,8 @@ public class RunMojo extends AbstractMojo {
 
     private final YivesMirrorUrlSource urlSource = new YivesMirrorUrlSource();
 
+    private final ZipExtractor zipExtractor = new ZipExtractor(logger);
+
     @Override
     public void execute() throws MojoExecutionException {
         try {
@@ -89,6 +91,8 @@ public class RunMojo extends AbstractMojo {
             } else {
                 saveRemoteJar(serverDescription, locationInCache);
             }
+
+            locationInCache = zipExtractor.unzipIfNecessary(locationInCache);
 
             logger.info("Preparing directory for running server ...");
             File serverDirectory = new File(project.getBuild().getDirectory(), directory);

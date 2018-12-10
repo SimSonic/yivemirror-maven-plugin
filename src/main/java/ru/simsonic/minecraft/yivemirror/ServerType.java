@@ -13,7 +13,7 @@ public enum ServerType {
 
     THERMOS("thermos", "Thermos-%s.zip"),
 
-    LOCALLY_PROVIDED("custom", "%s.jar");
+    LOCALLY_PROVIDED("custom", "%s");
 
     private final String catalog;
 

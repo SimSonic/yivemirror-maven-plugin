@@ -15,6 +15,11 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.artifact.ProjectArtifactMetadata;
 import ru.simsonic.minecraft.yivemirror.api.RemoteDescription;
+import ru.simsonic.minecraft.yivemirror.api.ServerDescription;
+import ru.simsonic.minecraft.yivemirror.api.ServerEnvironment;
+import ru.simsonic.minecraft.yivemirror.remotes.YivesMirrorUrlSource;
+import ru.simsonic.minecraft.yivemirror.utils.FileUtils;
+import ru.simsonic.minecraft.yivemirror.utils.LogWrapper;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -30,36 +35,29 @@ import java.util.stream.Stream;
 @Mojo(name = "run", defaultPhase = LifecyclePhase.PACKAGE)
 public class RunMojo extends AbstractMojo {
 
-    public static final String DEFAULT_SERVER_TYPE = "spigot";
-
-    public static final String DEFAULT_SERVER_VERSION = "latest";
-
-    public static final String DEFAULT_SUBDIRECTORY = "server";
-
-    public static final String DEFAULT_RESOURCES = "server-resources";
+    /**
+     * Custom server.jar name (should be in server-resources dir).
+     * If set, disables {@code serverType} and {@code serverVersion}.
+     */
+    @Parameter(property = "serverJar")
+    public String serverJar;
 
     /**
      * Spigot, PaperSpigot, Thermos, etc.
      */
-    @Parameter(property = "serverType", defaultValue = DEFAULT_SERVER_TYPE)
+    @Parameter(property = "serverType", defaultValue = "spigot")
     public String serverType;
 
     /**
      * Like 1.12.2-R0.1-SNAPSHOT-b1612
      */
-    @Parameter(property = "serverVersion", defaultValue = DEFAULT_SERVER_VERSION)
+    @Parameter(property = "serverVersion", defaultValue = "latest")
     public String serverVersion;
 
-    /**
-     * Custom server.jar name (should be in server-resources dir)
-     */
-    @Parameter(property = "serverJar")
-    public String serverJar;
-
-    @Parameter(property = "directory", defaultValue = DEFAULT_SUBDIRECTORY)
+    @Parameter(property = "directory", defaultValue = "server")
     public String directory;
 
-    @Parameter(property = "resources", defaultValue = DEFAULT_RESOURCES)
+    @Parameter(property = "resources", defaultValue = "server-resources")
     public String resources;
 
     // Inject Maven project
@@ -67,8 +65,6 @@ public class RunMojo extends AbstractMojo {
     private MavenProject project;
 
     private final LogWrapper logger = new LogWrapper(getLog());
-
-    private final LocalCache localCache = new LocalCache();
 
     private final ServerStarter serverStarter = new ServerStarter(logger);
 
@@ -85,7 +81,7 @@ public class RunMojo extends AbstractMojo {
                     : ServerDescription.forRemote(serverType, serverVersion);
 
             String filename = urlSource.getFilenameForServer(serverDescription);
-            File locationInCache = localCache.getServerFile(serverDescription, filename);
+            File locationInCache = FileUtils.getServerFile(serverDescription, filename);
             if (isLocallyProvidedJar) {
                 saveLocallyProvidedJar(serverDescription, locationInCache);
             } else {

@@ -1,6 +1,8 @@
 package ru.simsonic.minecraft.yivemirror;
 
 import lombok.RequiredArgsConstructor;
+import ru.simsonic.minecraft.yivemirror.utils.FileUtils;
+import ru.simsonic.minecraft.yivemirror.utils.LogWrapper;
 
 import java.io.BufferedOutputStream;
 import java.io.File;

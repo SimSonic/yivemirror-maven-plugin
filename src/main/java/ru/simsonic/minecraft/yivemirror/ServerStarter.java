@@ -1,5 +1,8 @@
 package ru.simsonic.minecraft.yivemirror;
 
+import ru.simsonic.minecraft.yivemirror.api.ServerEnvironment;
+import ru.simsonic.minecraft.yivemirror.utils.LogWrapper;
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;

@@ -166,9 +166,10 @@ public class RunMojo extends AbstractMojo {
         artifact.addMetadata(metadata);
 
         File artFile = artifact.getFile();
-
-        File installedPlugin = new File(pluginsDirectory, artFile.getName());
-        Files.copy(artFile.toPath(), installedPlugin.toPath());
+        if (artFile != null && artFile.isFile()) {
+            File installedPlugin = new File(pluginsDirectory, artFile.getName());
+            Files.copy(artFile.toPath(), installedPlugin.toPath());
+        }
     }
 
     private void copyResources(File resourcesDir, File serverDirectory) throws IOException {
